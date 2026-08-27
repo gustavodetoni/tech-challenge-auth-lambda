@@ -1,0 +1,18 @@
+project_name = "tech-challenge"
+aws_region   = "us-east-1"
+environment  = "homolog"
+
+db_user     = "tech_challenge"
+db_password = "troque-essa-senha"
+
+jwt_secret         = "troque-esse-secret"
+jwt_expiry_minutes = 60
+
+k8s_state_bucket = "tech-challenge-terraform-state"
+k8s_state_key    = "tech-challenge/k8s/terraform.tfstate"
+k8s_state_region = "us-east-1"
+
+database_state_bucket = "tech-challenge-terraform-state"
+database_state_key    = "tech-challenge/database/terraform.tfstate"
+database_state_region = "us-east-1"
+

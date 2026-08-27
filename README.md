@@ -13,6 +13,7 @@ Esta Lambda atende o requisito de autenticacao serverless do desafio. Ela valida
 - AWS API Gateway
 - PostgreSQL gerenciado
 - JWT
+- Terraform
 - GitHub Actions
 
 ## Contrato Inicial
@@ -46,8 +47,8 @@ Resposta esperada:
 ## Execucao Local
 
 ```bash
-go test ./...
-go run ./cmd/auth
+make tests
+make package
 ```
 
 Variaveis esperadas:
@@ -71,6 +72,21 @@ homolog      -> deploy homolog
 main         -> deploy producao
 ```
 
+O Terraform da Lambda fica em `terraform/` e consome os outputs dos repositorios:
+
+- `tech-challenge-infra-k8s`: VPC, subnets privadas e security group da Lambda.
+- `tech-challenge-infra-database`: endpoint, porta e nome do RDS PostgreSQL.
+
+Exemplo:
+
+```bash
+cp terraform/terraform.tfvars.example terraform/terraform.tfvars
+make package
+terraform -chdir=terraform init
+terraform -chdir=terraform plan
+terraform -chdir=terraform apply
+```
+
 ## Arquitetura
 
 ```text
@@ -80,9 +96,20 @@ API Gateway
       -> JWT assinado
 ```
 
+Internamente, o codigo segue a mesma separacao da API principal:
+
+```text
+cmd                       Composition root da Lambda
+internal/domain           Entidades centrais
+internal/application      Caso de uso e portas
+internal/interfaces       Adapter AWS Lambda/API Gateway
+internal/infra            JWT e PostgreSQL
+pkg/br                    Validacao reutilizavel de CPF/CNPJ
+terraform                 Infraestrutura da Lambda
+```
+
 ## Links
 
 - Swagger/Postman da API principal: pendente
 - Deploy homologacao: pendente
 - Deploy producao: pendente
-

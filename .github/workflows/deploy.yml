@@ -1,38 +1,40 @@
-name: Deploy
+name: Deploy Disabled
 
 on:
-  push:
-    branches:
-      - homolog
-      - main
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  deploy:
-    name: Deploy Lambda
+  disabled:
+    name: Deploy Disabled
     runs-on: ubuntu-latest
-    environment: ${{ github.ref_name == 'main' && 'production' || 'homolog' }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
+      - name: Explain
+        run: echo "Deploy disabled for the first GitHub version. Enable this workflow after AWS secrets and Terraform backend are configured."
 
-      - name: Setup Go
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
-
-      - name: Test
-        run: go test ./...
-
-      - name: Package
-        run: |
-          mkdir -p dist
-          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o dist/bootstrap ./cmd/auth
-          cd dist
-          zip function.zip bootstrap
-
-      - name: Deploy placeholder
-        run: echo "Configure AWS credentials and lambda update-function-code here."
-
+# Deploy futuro:
+#
+# on:
+#   push:
+#     branches:
+#       - homolog
+#       - main
+#
+# jobs:
+#   deploy:
+#     name: Deploy Lambda
+#     runs-on: ubuntu-latest
+#     environment: ${{ github.ref_name == 'main' && 'production' || 'homolog' }}
+#     steps:
+#       - uses: actions/checkout@v6
+#       - uses: actions/setup-go@v6
+#         with:
+#           go-version-file: go.mod
+#       - run: make tests
+#       - run: make package
+#       - uses: hashicorp/setup-terraform@v3
+#       - run: terraform -chdir=terraform init -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}"
+#       - run: terraform -chdir=terraform plan -out=tfplan
+#       - run: terraform -chdir=terraform apply -auto-approve tfplan
