@@ -2,6 +2,13 @@
 
 Function serverless responsavel por autenticar clientes por CPF/CNPJ e emitir JWTs para consumo das APIs protegidas da oficina.
 
+## Repositorios Da Entrega
+
+- Aplicacao principal: https://github.com/gustavodetoni/tech-challenge-project
+- Lambda Auth CPF/CNPJ: https://github.com/gustavodetoni/tech-challenge-auth-lambda
+- Infra Kubernetes: https://github.com/gustavodetoni/tech-challenge-infra-k8s
+- Infra Database: https://github.com/gustavodetoni/tech-challenge-infra-database
+
 ## Proposito
 
 Esta Lambda atende o requisito de autenticacao serverless do desafio. Ela valida o documento informado, consulta a base de clientes no banco gerenciado e devolve um token JWT com escopos de cliente.
@@ -62,7 +69,8 @@ JWT_EXPIRY_MINUTES=60
 
 ## Deploy
 
-O deploy sera executado por GitHub Actions nas branches de homologacao e producao.
+O workflow de deploy esta versionado em `.github/workflows/deploy.yml`, mas o deploy automatico esta temporariamente desabilitado para o primeiro push do repositorio.
+Quando as variaveis AWS/Terraform estiverem configuradas, o workflow deve ser reativado para deploy nas branches de homologacao e producao.
 
 Fluxo previsto:
 
@@ -110,6 +118,8 @@ terraform                 Infraestrutura da Lambda
 
 ## Links
 
-- Swagger/Postman da API principal: pendente
-- Deploy homologacao: pendente
-- Deploy producao: pendente
+- Repositorio: https://github.com/gustavodetoni/tech-challenge-auth-lambda
+- Swagger da API principal: https://github.com/gustavodetoni/tech-challenge-project/blob/main/docs/swagger.yaml
+- Postman da API principal: https://github.com/gustavodetoni/tech-challenge-project/blob/main/docs/collections/tech-challenge.postman_collection.json
+- Deploy homologacao: sera atualizado apos o primeiro deploy cloud.
+- Deploy producao: sera atualizado apos o primeiro deploy cloud.
