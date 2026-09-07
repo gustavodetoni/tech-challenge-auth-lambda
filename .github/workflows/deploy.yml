@@ -1,40 +1,215 @@
-name: Deploy Disabled
+name: Deploy
 
 on:
   workflow_dispatch:
+    inputs:
+      action:
+        description: "Acao do Terraform"
+        required: true
+        default: "apply"
+        type: choice
+        options:
+          - apply
+          - destroy
+      environment:
+        description: "Ambiente"
+        required: true
+        default: "homolog"
+        type: choice
+        options:
+          - homolog
+          - prod
+  # Deploy automatico futuro:
+  # push:
+  #   branches:
+  #     - homolog
+  #     - main
 
 permissions:
   contents: read
 
-jobs:
-  disabled:
-    name: Deploy Disabled
-    runs-on: ubuntu-latest
-    steps:
-      - name: Explain
-        run: echo "Deploy disabled for the first GitHub version. Enable this workflow after AWS secrets and Terraform backend are configured."
+env:
+  AWS_REGION: us-east-1
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
 
-# Deploy futuro:
-#
-# on:
-#   push:
-#     branches:
-#       - homolog
-#       - main
-#
-# jobs:
-#   deploy:
-#     name: Deploy Lambda
-#     runs-on: ubuntu-latest
-#     environment: ${{ github.ref_name == 'main' && 'production' || 'homolog' }}
-#     steps:
-#       - uses: actions/checkout@v6
-#       - uses: actions/setup-go@v6
-#         with:
-#           go-version-file: go.mod
-#       - run: make tests
-#       - run: make package
-#       - uses: hashicorp/setup-terraform@v3
-#       - run: terraform -chdir=terraform init -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}"
-#       - run: terraform -chdir=terraform plan -out=tfplan
-#       - run: terraform -chdir=terraform apply -auto-approve tfplan
+jobs:
+  apply:
+    name: Apply Lambda Auth
+    if: ${{ inputs.action == 'apply' }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment == 'prod' && 'production' || 'homolog' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Validate required secrets
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
+          TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
+          TF_VAR_DB_PASSWORD: ${{ secrets.TF_VAR_DB_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+        run: |
+          test -n "$AWS_ACCESS_KEY_ID" || (echo "AWS_ACCESS_KEY_ID secret is required." && exit 1)
+          test -n "$AWS_SECRET_ACCESS_KEY" || (echo "AWS_SECRET_ACCESS_KEY secret is required." && exit 1)
+          test -n "$AWS_SESSION_TOKEN" || (echo "AWS_SESSION_TOKEN secret is required for AWS Academy." && exit 1)
+          test -n "$TF_STATE_BUCKET" || (echo "TF_STATE_BUCKET secret is required." && exit 1)
+          test -n "$TF_VAR_DB_PASSWORD" || (echo "TF_VAR_DB_PASSWORD secret is required." && exit 1)
+          test -n "$JWT_SECRET" || (echo "JWT_SECRET secret is required." && exit 1)
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Run tests
+        run: make tests
+
+      - name: Package Lambda
+        run: make package
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Ensure Terraform state bucket
+        env:
+          TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
+        run: |
+          if ! aws s3api head-bucket --bucket "$TF_STATE_BUCKET" 2>/dev/null; then
+            aws s3api create-bucket --bucket "$TF_STATE_BUCKET" --region "$AWS_REGION"
+            aws s3api put-bucket-versioning \
+              --bucket "$TF_STATE_BUCKET" \
+              --versioning-configuration Status=Enabled
+          fi
+
+      - name: Terraform init
+        run: |
+          terraform -chdir=terraform init \
+            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+            -backend-config="key=tech-challenge/lambda/${{ inputs.environment }}.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}"
+
+      - name: Terraform validate
+        run: terraform -chdir=terraform validate
+
+      - name: Terraform plan
+        env:
+          TF_VAR_environment: ${{ inputs.environment }}
+          TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD }}
+          TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
+          TF_VAR_k8s_state_bucket: ${{ secrets.TF_STATE_BUCKET }}
+          TF_VAR_k8s_state_key: tech-challenge/k8s/${{ inputs.environment }}.tfstate
+          TF_VAR_k8s_state_region: ${{ env.AWS_REGION }}
+          TF_VAR_database_state_bucket: ${{ secrets.TF_STATE_BUCKET }}
+          TF_VAR_database_state_key: tech-challenge/database/${{ inputs.environment }}.tfstate
+          TF_VAR_database_state_region: ${{ env.AWS_REGION }}
+        run: terraform -chdir=terraform plan -out=tfplan
+
+      - name: Terraform apply
+        env:
+          TF_VAR_environment: ${{ inputs.environment }}
+          TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD }}
+          TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
+          TF_VAR_k8s_state_bucket: ${{ secrets.TF_STATE_BUCKET }}
+          TF_VAR_k8s_state_key: tech-challenge/k8s/${{ inputs.environment }}.tfstate
+          TF_VAR_k8s_state_region: ${{ env.AWS_REGION }}
+          TF_VAR_database_state_bucket: ${{ secrets.TF_STATE_BUCKET }}
+          TF_VAR_database_state_key: tech-challenge/database/${{ inputs.environment }}.tfstate
+          TF_VAR_database_state_region: ${{ env.AWS_REGION }}
+        run: terraform -chdir=terraform apply -auto-approve tfplan
+
+      - name: Print Lambda outputs
+        run: |
+          function_name="$(terraform -chdir=terraform output -raw function_name)"
+          function_invoke_arn="$(terraform -chdir=terraform output -raw function_invoke_arn)"
+
+          {
+            echo "## Lambda Auth outputs"
+            echo ""
+            echo "- Environment: ${{ inputs.environment }}"
+            echo "- Function name: $function_name"
+            echo "- Function invoke ARN: $function_invoke_arn"
+            echo ""
+            echo "Use esses valores no segundo apply do repo tech-challenge-infra-k8s:"
+            echo ""
+            echo "- auth_lambda_function_name: $function_name"
+            echo "- auth_lambda_invoke_arn: $function_invoke_arn"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  destroy:
+    name: Destroy Lambda Auth
+    if: ${{ inputs.action == 'destroy' }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment == 'prod' && 'production' || 'homolog' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Validate required secrets
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
+          TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
+          TF_VAR_DB_PASSWORD: ${{ secrets.TF_VAR_DB_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+        run: |
+          test -n "$AWS_ACCESS_KEY_ID" || (echo "AWS_ACCESS_KEY_ID secret is required." && exit 1)
+          test -n "$AWS_SECRET_ACCESS_KEY" || (echo "AWS_SECRET_ACCESS_KEY secret is required." && exit 1)
+          test -n "$AWS_SESSION_TOKEN" || (echo "AWS_SESSION_TOKEN secret is required for AWS Academy." && exit 1)
+          test -n "$TF_STATE_BUCKET" || (echo "TF_STATE_BUCKET secret is required." && exit 1)
+          test -n "$TF_VAR_DB_PASSWORD" || (echo "TF_VAR_DB_PASSWORD secret is required." && exit 1)
+          test -n "$JWT_SECRET" || (echo "JWT_SECRET secret is required." && exit 1)
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Package Lambda
+        run: make package
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Terraform init
+        run: |
+          terraform -chdir=terraform init \
+            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+            -backend-config="key=tech-challenge/lambda/${{ inputs.environment }}.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}"
+
+      - name: Terraform destroy
+        env:
+          TF_VAR_environment: ${{ inputs.environment }}
+          TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD }}
+          TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
+          TF_VAR_k8s_state_bucket: ${{ secrets.TF_STATE_BUCKET }}
+          TF_VAR_k8s_state_key: tech-challenge/k8s/${{ inputs.environment }}.tfstate
+          TF_VAR_k8s_state_region: ${{ env.AWS_REGION }}
+          TF_VAR_database_state_bucket: ${{ secrets.TF_STATE_BUCKET }}
+          TF_VAR_database_state_key: tech-challenge/database/${{ inputs.environment }}.tfstate
+          TF_VAR_database_state_region: ${{ env.AWS_REGION }}
+        run: terraform -chdir=terraform destroy -auto-approve

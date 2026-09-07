@@ -69,15 +69,22 @@ JWT_EXPIRY_MINUTES=60
 
 ## Deploy
 
-O workflow de deploy esta versionado em `.github/workflows/deploy.yml`, mas o deploy automatico esta temporariamente desabilitado para o primeiro push do repositorio.
-Quando as variaveis AWS/Terraform estiverem configuradas, o workflow deve ser reativado para deploy nas branches de homologacao e producao.
+O deploy e executado manualmente pelo GitHub Actions para facilitar a demonstracao e o destroy no AWS Academy.
+O gatilho automatico por `push` esta comentado no workflow e deve ser habilitado apenas quando as branches de homologacao/producao estiverem configuradas.
 
 Fluxo previsto:
 
 ```text
 pull_request -> lint/test
-homolog      -> deploy homolog
-main         -> deploy producao
+Run workflow -> action=apply, environment=homolog
+Run workflow -> action=destroy, environment=homolog
+```
+
+Inputs do workflow manual:
+
+```text
+action       apply ou destroy
+environment  homolog ou prod
 ```
 
 O Terraform da Lambda fica em `terraform/` e consome os outputs dos repositorios:
@@ -94,6 +101,21 @@ terraform -chdir=terraform init
 terraform -chdir=terraform plan
 terraform -chdir=terraform apply
 ```
+
+Secrets necessarios:
+
+```text
+AWS_ACCESS_KEY_ID
+AWS_SECRET_ACCESS_KEY
+AWS_SESSION_TOKEN
+TF_STATE_BUCKET
+TF_VAR_DB_PASSWORD
+JWT_SECRET
+```
+
+O workflow cria o bucket de state automaticamente caso ele ainda nao exista.
+O workflow imprime `function_name` e `function_invoke_arn` no resumo do GitHub Actions.
+Esses valores devem ser usados no segundo `apply` do repositorio `tech-challenge-infra-k8s`.
 
 ## Arquitetura
 
