@@ -13,6 +13,13 @@ provider "aws" {
   region = var.aws_region
 }
 
+data "aws_caller_identity" "current" {}
+
+locals {
+  aws_academy_service_role_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.aws_academy_service_role_name}"
+  lambda_role_arn              = var.lambda_role_arn != "" ? var.lambda_role_arn : local.aws_academy_service_role_arn
+}
+
 data "terraform_remote_state" "k8s" {
   backend = "s3"
 
@@ -32,4 +39,3 @@ data "terraform_remote_state" "database" {
     region = var.database_state_region
   }
 }
-

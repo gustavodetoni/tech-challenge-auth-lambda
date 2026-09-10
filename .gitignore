@@ -6,4 +6,9 @@ bin/
 dist/
 coverage.out
 tmp/
-
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log

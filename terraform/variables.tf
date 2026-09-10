@@ -22,6 +22,18 @@ variable "lambda_package_path" {
   default     = "../dist/function.zip"
 }
 
+variable "aws_academy_service_role_name" {
+  description = "Nome da IAM Role pre-criada pelo AWS Academy para ser usada pela Lambda."
+  type        = string
+  default     = "LabRole"
+}
+
+variable "lambda_role_arn" {
+  description = "ARN de uma IAM Role existente para execucao da Lambda. Se vazio, usa arn:aws:iam::<account>:role/LabRole."
+  type        = string
+  default     = ""
+}
+
 variable "db_user" {
   description = "Usuario do PostgreSQL usado pela Lambda."
   type        = string
@@ -89,4 +101,3 @@ variable "tags" {
     Managed = "terraform"
   }
 }
-

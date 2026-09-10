@@ -3,40 +3,9 @@ locals {
   database_url  = "postgres://${var.db_user}:${var.db_password}@${data.terraform_remote_state.database.outputs.database_host}:${data.terraform_remote_state.database.outputs.database_port}/${data.terraform_remote_state.database.outputs.database_name}?sslmode=require"
 }
 
-resource "aws_iam_role" "lambda" {
-  name = "${local.function_name}-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Principal = {
-          Service = "lambda.amazonaws.com"
-        }
-      }
-    ]
-  })
-
-  tags = merge(var.tags, {
-    Environment = var.environment
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "basic_execution" {
-  role       = aws_iam_role.lambda.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-}
-
-resource "aws_iam_role_policy_attachment" "vpc_execution" {
-  role       = aws_iam_role.lambda.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
-}
-
 resource "aws_lambda_function" "auth_cpf" {
   function_name = local.function_name
-  role          = aws_iam_role.lambda.arn
+  role          = local.lambda_role_arn
 
   filename         = var.lambda_package_path
   source_code_hash = filebase64sha256(var.lambda_package_path)
@@ -62,10 +31,4 @@ resource "aws_lambda_function" "auth_cpf" {
   tags = merge(var.tags, {
     Environment = var.environment
   })
-
-  depends_on = [
-    aws_iam_role_policy_attachment.basic_execution,
-    aws_iam_role_policy_attachment.vpc_execution,
-  ]
 }
-

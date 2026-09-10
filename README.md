@@ -72,6 +72,8 @@ JWT_EXPIRY_MINUTES=60
 O deploy e executado manualmente pelo GitHub Actions para facilitar a demonstracao e o destroy no AWS Academy.
 O gatilho automatico por `push` esta comentado no workflow e deve ser habilitado apenas quando as branches de homologacao/producao estiverem configuradas.
 
+Antes do `terraform init`, o workflow faz bootstrap do backend S3. Esse passo cria o bucket de state quando necessario e cria um state vazio valido quando o objeto `tech-challenge/lambda/<ambiente>.tfstate` tiver sido removido, evitando a falha `HeadObject 403` comum em contas AWS Academy sem permissao de listagem completa.
+
 Fluxo previsto:
 
 ```text
@@ -114,6 +116,7 @@ JWT_SECRET
 ```
 
 O workflow cria o bucket de state automaticamente caso ele ainda nao exista.
+Em AWS Academy, a Lambda reutiliza por padrao a role pre-criada `LabRole`, evitando criacao/anexo de IAM policies pela esteira. Se outro ambiente exigir uma role diferente, informe `TF_VAR_lambda_role_arn` ou ajuste `lambda_role_arn` no Terraform.
 O workflow imprime `function_name` e `function_invoke_arn` no resumo do GitHub Actions.
 Esses valores devem ser usados no segundo `apply` do repositorio `tech-challenge-infra-k8s`.
 

@@ -8,8 +8,9 @@ tests:
 		go test ./... -count=1
 
 package:
-	mkdir -p dist
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o dist/bootstrap ./cmd
+	mkdir -p dist /tmp/go-tmp /tmp/go-build-cache-auth-lambda
+	GOCACHE=/tmp/go-build-cache-auth-lambda GOTMPDIR=/tmp/go-tmp \
+		GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o dist/bootstrap ./cmd
 	cd dist && zip function.zip bootstrap
 
 fmt:
