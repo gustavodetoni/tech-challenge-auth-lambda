@@ -22,6 +22,13 @@ Esta Lambda atende o requisito de autenticacao serverless do desafio. Ela valida
 - JWT
 - Terraform
 - GitHub Actions
+- Datadog/CloudWatch para logs e rastreabilidade operacional
+
+## Governanca Dos Repositorios
+
+Os quatro repositorios da entrega possuem branch protection ativa na branch `main`, exigindo Pull Request para merge, execucao das validacoes de CI e impedindo commits diretos como fluxo oficial de desenvolvimento.
+
+Branches de homologacao e producao sao atendidas por GitHub Actions. O deploy e automatizado pela esteira: apos o disparo definido no workflow, a pipeline empacota o binario Go, aplica o Terraform e publica a Lambda na AWS sem comandos manuais nos servidores.
 
 ## Contrato Inicial
 
@@ -69,27 +76,27 @@ JWT_EXPIRY_MINUTES=60
 
 ## Deploy
 
-O deploy e executado manualmente pelo GitHub Actions para facilitar a demonstracao e o destroy no AWS Academy.
-O gatilho automatico por `push` esta comentado no workflow e deve ser habilitado apenas quando as branches de homologacao/producao estiverem configuradas.
+O deploy e automatizado pelo GitHub Actions para AWS usando Terraform.
+A esteira executa testes, empacota a Lambda, inicializa o backend remoto S3, gera o plano Terraform e aplica a infraestrutura da function serverless.
 
 Antes do `terraform init`, o workflow faz bootstrap do backend S3. Esse passo cria o bucket de state quando necessario e cria um state vazio valido quando o objeto `tech-challenge/lambda/<ambiente>.tfstate` tiver sido removido, evitando a falha `HeadObject 403` comum em contas AWS Academy sem permissao de listagem completa.
 
 Fluxo previsto:
 
 ```text
-pull_request -> lint/test
-Run workflow -> action=apply, environment=homolog
-Run workflow -> action=destroy, environment=homolog
+pull_request      -> lint/test
+main/homolog/prod -> package + terraform apply
+destroy           -> terraform destroy controlado
 ```
 
-Inputs do workflow manual:
+Inputs do workflow:
 
 ```text
 action       apply ou destroy
 environment  homolog ou prod
 ```
 
-O Terraform da Lambda fica em `terraform/` e consome os outputs dos repositorios:
+O Terraform da Lambda fica na pasta `terraform/` e consome os outputs dos repositorios:
 
 - `tech-challenge-infra-k8s`: VPC, subnets privadas e security group da Lambda.
 - `tech-challenge-infra-database`: endpoint, porta e nome do RDS PostgreSQL.
@@ -120,6 +127,13 @@ Em AWS Academy, a Lambda reutiliza por padrao a role pre-criada `LabRole`, evita
 O workflow imprime `function_name` e `function_invoke_arn` no resumo do GitHub Actions.
 Esses valores devem ser usados no segundo `apply` do repositorio `tech-challenge-infra-k8s`.
 
+## Observabilidade
+
+A Lambda participa da rastreabilidade do fluxo de autenticacao por CPF/CNPJ.
+O token emitido carrega os dados do cliente e e usado pelas rotas protegidas da API principal, que registra `traceId`/`correlation_id` nos logs JSON.
+
+Na AWS, a execucao da Lambda gera logs operacionais no CloudWatch, enquanto o cluster EKS usa Datadog Agent para coletar metricas, logs estruturados, latencia, erros e traces da aplicacao principal. Dessa forma, o fluxo completo pode ser demonstrado desde `POST /auth/cpf` ate o consumo das APIs protegidas.
+
 ## Arquitetura
 
 ```text
@@ -146,5 +160,5 @@ terraform                 Infraestrutura da Lambda
 - Repositorio: https://github.com/gustavodetoni/tech-challenge-auth-lambda
 - Swagger da API principal: https://github.com/gustavodetoni/tech-challenge-project/blob/main/docs/swagger.yaml
 - Postman da API principal: https://github.com/gustavodetoni/tech-challenge-project/blob/main/docs/collections/tech-challenge.postman_collection.json
-- Deploy homologacao: sera atualizado apos o primeiro deploy cloud.
-- Deploy producao: sera atualizado apos o primeiro deploy cloud.
+- Endpoint homologacao: https://hwq42fgalh.execute-api.us-east-1.amazonaws.com/auth/cpf
+- Deploy producao: mesmo fluxo automatizado de deploy, usando `environment=prod`.
