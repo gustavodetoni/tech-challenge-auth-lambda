@@ -2,6 +2,10 @@
 
 Function serverless responsavel por autenticar clientes por CPF/CNPJ e emitir JWTs para consumo das APIs protegidas da oficina.
 
+## Relação com a Fase 4
+
+A Lambda continua sendo o componente de autenticação compartilhado. Ela não é um dos três microsserviços de negócio: OS Service, Billing Service e Execution Service possuem repositórios, bancos e pipelines próprios. O JWT emitido aqui deve ser validado pelo API Gateway ou pelos adaptadores HTTP dos serviços quando as rotas forem publicadas externamente.
+
 ## Repositorios Da Entrega
 
 - Aplicacao principal: https://github.com/gustavodetoni/tech-challenge-project
@@ -26,7 +30,7 @@ Esta Lambda atende o requisito de autenticacao serverless do desafio. Ela valida
 
 ## Governanca Dos Repositorios
 
-Os quatro repositorios da entrega possuem branch protection ativa na branch `main`, exigindo Pull Request para merge, execucao das validacoes de CI e impedindo commits diretos como fluxo oficial de desenvolvimento.
+Os repositórios oficiais da Fase 3 possuem branch protection na branch `main`. Para a Fase 4, os três novos repositórios já possuem workflows e branch `main` local; a proteção de branch e os PRs obrigatórios ainda precisam ser habilitados após a publicação dos remotes.
 
 Branches de homologacao e producao sao atendidas por GitHub Actions. O deploy e automatizado pela esteira: apos o disparo definido no workflow, a pipeline empacota o binario Go, aplica o Terraform e publica a Lambda na AWS sem comandos manuais nos servidores.
 
@@ -133,6 +137,16 @@ A Lambda participa da rastreabilidade do fluxo de autenticacao por CPF/CNPJ.
 O token emitido carrega os dados do cliente e e usado pelas rotas protegidas da API principal, que registra `traceId`/`correlation_id` nos logs JSON.
 
 Na AWS, a execucao da Lambda gera logs operacionais no CloudWatch, enquanto o cluster EKS usa Datadog Agent para coletar metricas, logs estruturados, latencia, erros e traces da aplicacao principal. Dessa forma, o fluxo completo pode ser demonstrado desde `POST /auth/cpf` ate o consumo das APIs protegidas.
+
+## Checklist da entrega
+
+- [x] Código Go e validação CPF/CNPJ.
+- [x] JWT assinado e integração com PostgreSQL.
+- [x] Terraform e deploy independente.
+- [x] CI, testes e empacotamento.
+- [x] Logs CloudWatch e correlação com a plataforma.
+- [ ] Publicar as rotas dos microsserviços da Fase 4 atrás do API Gateway usando o authorizer.
+- [ ] Registrar evidência do deploy final e do fluxo distribuído no vídeo.
 
 ## Arquitetura
 
