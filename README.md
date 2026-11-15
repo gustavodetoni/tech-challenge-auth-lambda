@@ -176,3 +176,15 @@ terraform                 Infraestrutura da Lambda
 - Postman da API principal: https://github.com/gustavodetoni/tech-challenge-project/blob/main/docs/collections/tech-challenge.postman_collection.json
 - Endpoint homologacao: https://hwq42fgalh.execute-api.us-east-1.amazonaws.com/auth/cpf
 - Deploy producao: mesmo fluxo automatizado de deploy, usando `environment=prod`.
+
+## Papel na Fase 4
+
+A Auth Lambda é um componente transversal de autenticação, não um dos três microsserviços de negócio. Ela fornece JWT para proteger a entrada da solução e mantém repositório, pipeline, Terraform e banco próprios.
+
+```text
+Cliente
+  → API Gateway / Auth Lambda
+  → microsserviço autorizado
+```
+
+Os microsserviços da Fase 4 são responsáveis por OS, Billing e Execution. A infraestrutura Kubernetes dos três fica documentada no repositório [tech-challenge-infra-k8s](../tech-challenge-infra-k8s/README.md), enquanto esta Lambda mantém o fluxo de autenticação e autorização.
